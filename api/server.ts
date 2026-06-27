@@ -47,6 +47,7 @@ const connectDB = async () => {
     }
   } catch (err) {
     console.error('❌ MongoDB connection error:', err);
+    throw err;
   }
 };
 
@@ -60,7 +61,13 @@ app.use(express.json({ limit: '50mb' }));
 // Middleware to ensure DB connection on serverless
 app.use(async (req, res, next) => {
   if (process.env.VERCEL) {
-    await connectDB();
+    try {
+      await connectDB();
+    } catch {
+      return res.status(503).json({
+        error: 'Database connection failed. Check the MONGODB_URI environment variable.',
+      });
+    }
   }
   next();
 });
