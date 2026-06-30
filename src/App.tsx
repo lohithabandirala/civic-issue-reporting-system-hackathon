@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   X,
+  Trophy,
   ChevronRight,
   ChevronDown,
   AlertTriangle,
@@ -109,24 +110,24 @@ const safeFormatDate = (dateStr: any, formatStr: string) => {
 
 // --- Components ---
 
-const Button = ({ className, variant = 'primary', ...props }: any) => {
+const Button = ({ variant = 'primary', className, ...props }: any) => {
   const variants = {
-    primary: 'bg-civic-primary text-white hover:bg-blue-700',
-    secondary: 'bg-civic-secondary text-white hover:bg-emerald-600',
-    outline: 'border-2 border-slate-200 text-slate-600 hover:bg-slate-50',
-    ghost: 'text-slate-600 hover:bg-slate-100',
-    danger: 'bg-civic-danger text-white hover:bg-red-600',
+    primary: 'btn-primary',
+    secondary: 'btn-secondary',
+    outline: 'border-2 border-slate-200 text-slate-600 hover:bg-slate-50 rounded-2xl',
+    ghost: 'text-slate-600 hover:bg-slate-100 rounded-2xl',
+    danger: 'bg-civic-danger text-white hover:bg-red-700 rounded-2xl',
   };
   return (
     <button 
-      className={cn('px-4 py-2 rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50', variants[variant as keyof typeof variants], className)} 
+      className={cn(variants[variant as keyof typeof variants], className)} 
       {...props} 
     />
   );
 };
 
 const Card = ({ children, className }: any) => (
-  <div className={cn('bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 p-8', className)}>
+  <div className={cn('glass-panel p-8', className)}>
     {children}
   </div>
 );
@@ -346,19 +347,23 @@ export default function App({ forcePortal }: { forcePortal?: 'user' | 'admin' } 
                 <NavItem active={view === 'report'} icon={<PlusCircle size={20} />} label="Report Issue" onClick={() => { setView('report'); setIsMenuOpen(false); }} />
                 <NavItem active={view === 'feed'} icon={<MapIcon size={20} />} label="Community Feed" onClick={() => { setView('feed'); setIsMenuOpen(false); }} />
                 <NavItem active={view === 'history'} icon={<History size={20} />} label="My Reports" onClick={() => { setView('history'); setIsMenuOpen(false); }} />
+                <NavItem active={view === 'leaderboard'} icon={<Trophy size={20} />} label="Leaderboard" onClick={() => { setView('leaderboard'); setIsMenuOpen(false); }} />
               </>
             )}
             <NavItem active={view === 'profile'} icon={<User size={20} />} label="Profile" onClick={() => { setView('profile'); setIsMenuOpen(false); }} />
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-3 w-full px-4 py-3 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all font-semibold text-sm"
+            >
+              <LogOut size={20} />
+              <span>Logout</span>
+            </button>
           </div>
 
           <div className="pt-6 border-t border-slate-100">
-            <button 
-              onClick={handleLogout}
-              className="flex items-center gap-3 w-full px-4 py-3 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-            >
-              <LogOut size={20} />
-              <span className="font-medium">Logout</span>
-            </button>
+            <a href="/api/public/data" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-3 rounded-2xl transition-all cursor-pointer text-slate-500 hover:bg-slate-50 font-semibold text-sm">
+              <AnalyticsIcon size={20} /> Open Data API
+            </a>
           </div>
         </div>
       </nav>
@@ -414,6 +419,7 @@ export default function App({ forcePortal }: { forcePortal?: 'user' | 'admin' } 
                   />
                 );
                 if (view === 'history') return <MyReports key="history" issues={(issues || []).filter(i => i && i.userId === user?.id)} user={user} onRefresh={fetchIssues} />;
+                if (view === 'leaderboard') return <LeaderboardView key="leaderboard" />;
                 if (view === 'profile') return <ProfileView key="profile" user={user} />;
               } catch (e) {
                 console.error("View render crash:", e);
@@ -468,11 +474,7 @@ const WelcomeScreen = ({ onLogin, onRegister }: any) => {
         </div>
         <div className="hidden md:flex items-center gap-8 font-semibold text-sm text-slate-600">
           <a href="#" className="text-[#00A86B]">Home</a>
-          <a href="#" className="hover:text-[#00A86B] transition-colors">About</a>
-          <a href="#" className="hover:text-[#00A86B] transition-colors">gallery</a>
           <a href="#" className="hover:text-[#00A86B] transition-colors" onClick={(e) => { e.preventDefault(); onRegister(); }}>Report Issue</a>
-          <a href="#" className="hover:text-[#00A86B] transition-colors">View Issues</a>
-          <a href="#" className="hover:text-[#00A86B] transition-colors">Contact</a>
         </div>
         <div className="flex items-center gap-4">
           <button className="flex items-center gap-1 text-xs font-bold text-slate-700 bg-slate-100 px-3 py-2 rounded-md hover:bg-slate-200 transition-colors">
@@ -1316,21 +1318,37 @@ const Dashboard = ({ issues = [], setView, user, onRefresh }: any) => {
     emergency: userIssues.filter((i: any) => i.priority === 'Emergency').length,
   };
 
-  const chartData = [
-    { name: 'Mon', resolved: 4, reported: 6 },
-    { name: 'Tue', resolved: 7, reported: 5 },
-    { name: 'Wed', resolved: 5, reported: 8 },
-    { name: 'Thu', resolved: 12, reported: 10 },
-    { name: 'Fri', resolved: 15, reported: 12 },
-    { name: 'Sat', resolved: 10, reported: 7 },
-    { name: 'Sun', resolved: 18, reported: 9 },
-  ];
+  const chartData = useMemo(() => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const data = days.map(name => ({ name, resolved: 0, reported: 0 }));
+    
+    (issues || []).forEach((issue: any) => {
+      if (!issue || !issue.timestamp) return;
+      const date = new Date(issue.timestamp);
+      const day = date.getDay();
+      data[day].reported += 1;
+      if (issue.status === 'Resolved' || issue.status === 'Confirmed Resolved' || issue.status === 'Pending Citizen Confirmation') {
+        data[day].resolved += 1;
+      }
+    });
+    
+    // Reorder array to start from Mon to Sun
+    return [...data.slice(1), data[0]];
+  }, [issues]);
 
-  const recentActivities = [
-    { user: 'Rahul S.', action: 'verified a fix', target: 'Pothole in Jubilee Hills', time: '2m ago', icon: <CheckCircle2 size={14} className="text-emerald-500" /> },
-    { user: 'Priya K.', action: 'reported', target: 'Garbage Overflow', time: '15m ago', icon: <PlusCircle size={14} className="text-blue-500" /> },
-    { user: 'Amit V.', action: 'upvoted', target: 'Broken Streetlight', time: '1h ago', icon: <ThumbsUp size={14} className="text-amber-500" /> },
-  ];
+  const recentActivities = useMemo(() => {
+    return (issues || [])
+      .slice(0, 5)
+      .map((issue: any) => ({
+        user: issue.username || 'Anonymous',
+        action: (issue.status === 'Resolved' || issue.status === 'Confirmed Resolved' || issue.status === 'Pending Citizen Confirmation') ? 'resolved' : 'reported',
+        target: issue.category,
+        time: new Date(issue.timestamp).toLocaleDateString(),
+        icon: (issue.status === 'Resolved' || issue.status === 'Confirmed Resolved' || issue.status === 'Pending Citizen Confirmation') 
+          ? <CheckCircle2 size={14} className="text-emerald-500" /> 
+          : <PlusCircle size={14} className="text-blue-500" />
+      }));
+  }, [issues]);
 
   return (
     <motion.div 
@@ -2738,6 +2756,65 @@ const MyReports = ({ issues = [], user, onRefresh }: any) => {
   );
 };
 
+const LeaderboardView = () => {
+  const [leaders, setLeaders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        const res = await apiFetch('/api/leaderboard');
+        if (res.ok) {
+          const data = await safeJson(res);
+          setLeaders(data || []);
+        }
+      } catch (err) {
+        console.error("Leaderboard fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLeaderboard();
+  }, []);
+
+  if (loading) return <div className="p-8 text-center text-slate-500 font-medium">Loading Civic Heroes...</div>;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8">
+      <div>
+        <h2 className="text-3xl font-display font-bold text-slate-900">Civic Heroes Leaderboard</h2>
+        <p className="text-slate-500">Top citizens who are actively making our community better.</p>
+      </div>
+      <Card className="p-0 overflow-hidden">
+        <div className="divide-y divide-slate-100">
+          {leaders.map((leader, idx) => (
+            <div key={leader.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
+              <div className="flex items-center gap-6">
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center font-bold text-lg text-slate-600 relative">
+                  {idx < 3 && (
+                    <Trophy className={cn(
+                      "absolute -top-2 -right-2",
+                      idx === 0 ? "text-yellow-500" : idx === 1 ? "text-slate-400" : "text-amber-600"
+                    )} size={20} />
+                  )}
+                  {idx + 1}
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900">{leader.username}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs font-bold text-civic-primary uppercase tracking-wider">{leader.reputationPoints} Points</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {leaders.length === 0 && <div className="p-8 text-center text-slate-500">No data available yet.</div>}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
 const ProfileView = ({ user }: any) => {
   const journey = [
     { date: 'Mar 10, 2026', event: 'Joined CivicConnect', icon: '👋', color: 'bg-blue-500' },
@@ -3177,9 +3254,9 @@ const AdminIssueManager = ({ issues = [], onRefresh }: any) => {
 
                 <div className="space-y-6 mt-6">
 
-                  {(selectedIssue.status === 'Resolved' || selectedIssue.status === 'Pending Citizen Confirmation' || selectedIssue.status === 'Confirmed Resolved') && (
-                    <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 mb-6">
-                      <label className="block text-xs font-bold text-emerald-700 uppercase mb-2 tracking-widest">Resolution Proof</label>
+                  {(selectedIssue.status !== 'Pending') && (
+                    <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 mb-6 mt-4">
+                      <label className="block text-xs font-bold text-emerald-700 uppercase mb-2 tracking-widest">Upload Resolution Proof (AI Verification)</label>
                       <input 
                         type="file" 
                         accept="image/*" 
@@ -3188,6 +3265,7 @@ const AdminIssueManager = ({ issues = [], onRefresh }: any) => {
                         className="text-xs text-emerald-600 mb-2"
                       />
                       {adminResolutionImage && <img src={adminResolutionImage} className="w-full h-32 object-cover rounded-xl mt-2" />}
+                      <p className="text-[10px] text-emerald-700 mt-2">Upload a photo showing the fixed issue before clicking "Completed" to trigger AI verification.</p>
                     </div>
                   )}
 
