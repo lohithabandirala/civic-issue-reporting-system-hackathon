@@ -46,7 +46,7 @@ const connectDB = async () => {
     const db = await mongoose.connect(MONGODB_URI);
     isConnected = db.connections[0].readyState === 1;
     console.log('✅ Connected to MongoDB');
-    
+
     // Seed dynamic system configuration
     const configCount = await (SystemConfig as any).countDocuments();
     if (configCount === 0) {
@@ -100,7 +100,7 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage,
   limits: { fileSize: 15 * 1024 * 1024 } // 15MB limit
 });
@@ -134,7 +134,7 @@ function classifyPriority(category: string, description: string) {
   const emergencyKeywords = ['gas leak', 'structural collapse', 'live wire', 'emergency', 'danger', 'flood', 'accident'];
   const highKeywords = ['deep pothole', 'garbage heap', 'clogged drain', 'broken pipe', 'sanitation', 'vandalism', 'security'];
   const desc = description.toLowerCase();
-  
+
   if (emergencyKeywords.some(k => desc.includes(k)) || category === 'Electricity') return 'Emergency';
   if (highKeywords.some(k => desc.includes(k)) || category === 'Roads' || category === 'Sanitation') return 'High';
   return 'Normal';
@@ -144,11 +144,11 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371; // km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
 
@@ -189,12 +189,12 @@ const transporter = nodemailer.createTransport({
 app.post('/api/send-email-otp', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
-  
+
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   otpStore.set(email, { otp, expiresAt: Date.now() + 10 * 60 * 1000 }); // 10 mins
-  
+
   console.log(`\n\n=== EMAIL OTP for ${email}: ${otp} ===\n\n`);
-  
+
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     try {
       await transporter.sendMail({
@@ -210,7 +210,7 @@ app.post('/api/send-email-otp', async (req, res) => {
   } else {
     console.warn('⚠️ Email credentials missing in .env. Skipping real email.');
   }
-  
+
   res.json({ success: true, message: 'OTP sent to email successfully' });
 });
 
@@ -219,7 +219,7 @@ app.post('/api/register', async (req, res) => {
     const userCount = await (User as any).countDocuments();
     const role = userCount === 0 ? 'admin' : 'citizen';
     const id = Math.random().toString(36).substr(2, 9);
-    
+
     if (role === 'admin') {
       // First user becomes admin automatically. If registered via citizen form, generate a username.
       const { username, email, password } = req.body;
@@ -232,20 +232,20 @@ app.post('/api/register', async (req, res) => {
     } else {
       const { fullName, email, address, city, postalCode, otp } = req.body;
       if (!email || !otp) return res.status(400).json({ error: 'Email and OTP are required' });
-      
+
       if (otp !== '123456') {
         const storedOtpData = otpStore.get(email);
         if (!storedOtpData || storedOtpData.otp !== otp || storedOtpData.expiresAt < Date.now()) {
           return res.status(400).json({ error: 'Invalid or expired OTP' });
         }
       }
-      
+
       // Generate unique username to prevent MongoDB duplicate null key error
-      const user = await (User as any).create({ 
-        id, username: `citizen_${id}`, fullName, email, address, city, postalCode, role 
+      const user = await (User as any).create({
+        id, username: `citizen_${id}`, fullName, email, address, city, postalCode, role
       });
       const token = jwt.sign({ id, email, role }, JWT_SECRET);
-      
+
       otpStore.delete(email);
       return res.json({ token, user: { id, fullName, email, role, reputationPoints: 0, badges: [] } });
     }
@@ -262,7 +262,7 @@ app.post('/api/register', async (req, res) => {
 
 app.post('/api/login', async (req, res) => {
   const { username, email, password, otp } = req.body;
-  
+
   // Admin Login (Username + Password)
   if (username && password) {
     const user: any = await (User as any).findOne({ username }).lean();
@@ -273,8 +273,8 @@ app.post('/api/login', async (req, res) => {
     const token = jwt.sign({ id: user.id, username: user.username, email: user.email, role: user.role }, JWT_SECRET);
     const { password: _, ...profile } = user;
     return res.json({ token, user: profile });
-  } 
-  
+  }
+
   // Citizen Login (Email + OTP)
   if (email && otp) {
     if (otp !== '123456') {
@@ -330,16 +330,16 @@ app.post('/api/issues/:id/upvote', authenticateToken, async (req: any, res) => {
   try {
     const issueId = req.params.id;
     const userId = req.user.id;
-    
+
     const issue = await (Issue as any).findOne({ id: issueId });
     if (!issue) return res.status(404).json({ error: 'Issue not found' });
-    
+
     // Check if user already upvoted
     if (issue.votedBy && issue.votedBy.includes(userId)) {
       // Remove vote (toggle)
       await (Issue as any).updateOne(
         { id: issueId },
-        { 
+        {
           $inc: { upvotes: -1 },
           $pull: { votedBy: userId }
         }
@@ -348,11 +348,11 @@ app.post('/api/issues/:id/upvote', authenticateToken, async (req: any, res) => {
       await (User as any).updateOne({ id: issue.userId }, { $inc: { reputationPoints: -10 } });
       return res.json({ success: true, message: 'Upvote removed' });
     }
-    
+
     // Add vote
     await (Issue as any).updateOne(
       { id: issueId },
-      { 
+      {
         $inc: { upvotes: 1 },
         $push: { votedBy: userId }
       }
@@ -383,7 +383,7 @@ app.post('/api/communityVote', authenticateToken, async (req: any, res) => {
 
     const voteObj = { userId, username, vote, comment, proofUrl, timestamp: new Date().toISOString() };
     const updateQuery: any = { $push: { communityVotes: voteObj } };
-    
+
     if (vote === 'Resolved') {
       updateQuery.$inc = { voteCountResolved: 1 };
     } else {
@@ -391,10 +391,10 @@ app.post('/api/communityVote', authenticateToken, async (req: any, res) => {
     }
 
     await (Issue as any).updateOne({ id: issueId }, updateQuery);
-    
+
     // Award 5 reputation points to the voter for participating in community verification
     await (User as any).updateOne({ id: userId }, { $inc: { reputationPoints: 5 } });
-    
+
     res.json({ success: true, message: 'Vote submitted successfully' });
   } catch (err) {
     console.error("Community Vote Error:", err);
@@ -405,7 +405,7 @@ app.post('/api/communityVote', authenticateToken, async (req: any, res) => {
 app.post('/api/reportIssue', authenticateToken, async (req: any, res) => {
   try {
     const { category, description, imageUrl, locationAddress, latitude, longitude, priority, division, prabhag } = req.body;
-    
+
     // 1. Run EXIF Image Forensics
     let forensicIsFake = false;
     let forensicReasons: string[] = [];
@@ -441,14 +441,14 @@ app.post('/api/reportIssue', authenticateToken, async (req: any, res) => {
     const imageNotCivic = aiResult?.imageAnalysis?.showsCivicIssue === false;
     const headingMismatch = aiResult?.imageAnalysis?.matchesHeading === false;
     const descriptionMismatch = aiResult?.imageAnalysis?.matchesDescription === false;
-    
+
     const isFake = (forensicIsFake || aiSaysFake || imageMismatch || lowCoherence || imageNotCivic || headingMismatch || descriptionMismatch) ? 1 : 0;
-    
+
     // Combine AI reasons with Forensic reasons
     const finalFakeReason = forensicIsFake ? `Image Forensics Failed: ${forensicReasons.join(' ')} ${fakeReason || ''}` : fakeReason;
 
     const id = Math.random().toString(36).substr(2, 9);
-    
+
     // Duplicate Detection
     let isDuplicate = false;
     let duplicateOf = undefined;
@@ -474,10 +474,10 @@ app.post('/api/reportIssue', authenticateToken, async (req: any, res) => {
       } else if (catLower.includes('drainage') || catLower.includes('water')) {
         assignedTeam = 'team-003';
       }
-      
-      if (assignedTeam) { 
-        status = 'Assigned'; 
-        await WorkerTeam.updateOne({ id: assignedTeam }, { $inc: { activeTasks: 1 } }); 
+
+      if (assignedTeam) {
+        status = 'Assigned';
+        await WorkerTeam.updateOne({ id: assignedTeam }, { $inc: { activeTasks: 1 } });
       }
     }
 
@@ -505,7 +505,7 @@ app.post('/api/reportIssue', authenticateToken, async (req: any, res) => {
         await sendNotification(assignedTeam, 'New Task Assigned', `A new ${finalCategory} issue has been assigned to your team.`, id);
       }
       await sendNotification('admin', 'New Civic Issue', `A new ${finalPriority} priority issue has been reported in ${finalCategory}.`, id);
-      
+
       // EMERGENCY DISPATCH
       if (finalPriority === 'Emergency') {
         console.log(`\n\n🚨 [EMERGENCY DISPATCH] Dispatching authorities for Issue #${id} (${finalCategory})\n\n`);
@@ -543,13 +543,13 @@ app.post('/api/reportIssue', authenticateToken, async (req: any, res) => {
       await sendNotification('admin', 'Image-Text Mismatch', `Issue #${id}: The uploaded image does not match the description. AI says image shows: "${imageDescription || 'unknown'}". Needs manual review.`, id);
     }
 
-    res.json({ 
-      success: true, id, status, 
-      aiAnalysis: { 
-        category: finalCategory, priority: finalPriority, 
+    res.json({
+      success: true, id, status,
+      aiAnalysis: {
+        category: finalCategory, priority: finalPriority,
         isFake: !!isFake, fakeReason,
-        imageTextMatch, imageDescription, imageTextCoherenceScore 
-      } 
+        imageTextMatch, imageDescription, imageTextCoherenceScore
+      }
     });
   } catch (err) {
     console.error("Report Error:", err);
@@ -580,16 +580,16 @@ app.get('/api/public/stats', async (req, res) => {
 app.get('/api/public/data', async (req, res) => {
   try {
     const issues = await (Issue as any).find({ isFake: { $ne: 1 } })
-      .select({ 
-        _id: 0, 
-        id: 1, 
-        category: 1, 
-        priority: 1, 
-        status: 1, 
-        latitude: 1, 
-        longitude: 1, 
-        timestamp: 1, 
-        resolvedAt: 1 
+      .select({
+        _id: 0,
+        id: 1,
+        category: 1,
+        priority: 1,
+        status: 1,
+        latitude: 1,
+        longitude: 1,
+        timestamp: 1,
+        resolvedAt: 1
       })
       .sort({ timestamp: -1 })
       .lean();
@@ -615,21 +615,21 @@ app.put('/api/admin/issues/:id', authenticateToken, async (req: any, res) => {
   try {
     const issueId = req.params.id;
     const { status, assignedTeam, adminNotes, isFake, resolutionImage } = req.body;
-    
+
     const issue = await (Issue as any).findOne({ id: issueId });
     if (!issue) return res.status(404).json({ error: 'Issue not found' });
 
     const updates: any = {};
     const oldStatus = issue.status;
     const oldTeam = issue.assignedTeam;
-    
+
     // Status update
     if (status) {
       updates.status = status;
-      
+
       if (status === 'Resolved') {
         updates.resolvedAt = new Date().toISOString();
-        
+
         // Before-After AI Verification
         if (resolutionImage && issue.imageUrl) {
           console.log(`🔍 Running Before-After AI Verification for Issue #${issueId}`);
@@ -647,9 +647,9 @@ app.put('/api/admin/issues/:id', authenticateToken, async (req: any, res) => {
         updates.status = 'Pending Citizen Confirmation';
         // Notify the reporter
         await sendNotification(
-          issue.userId, 
-          'Issue Resolution – Please Verify', 
-          `Your reported issue "${issue.category}" has been marked as resolved. Please verify the fix.`, 
+          issue.userId,
+          'Issue Resolution – Please Verify',
+          `Your reported issue "${issue.category}" has been marked as resolved. Please verify the fix.`,
           issueId
         );
         // Notify admin
@@ -662,13 +662,13 @@ app.put('/api/admin/issues/:id', authenticateToken, async (req: any, res) => {
           issueId
         );
       }
-      
+
       if (status === 'In Progress') {
         // Notify the reporter
         await sendNotification(
-          issue.userId, 
-          'Issue In Progress', 
-          `Your reported issue "${issue.category}" is now being worked on.`, 
+          issue.userId,
+          'Issue In Progress',
+          `Your reported issue "${issue.category}" is now being worked on.`,
           issueId
         );
         // Notify admin
@@ -680,14 +680,14 @@ app.put('/api/admin/issues/:id', authenticateToken, async (req: any, res) => {
         );
       }
     }
-    
+
     // Team assignment
     if (assignedTeam !== undefined) {
       updates.assignedTeam = assignedTeam;
       if (!updates.status) {
         updates.status = 'Assigned';
       }
-      
+
       // Decrement old team tasks
       if (oldTeam && oldTeam !== assignedTeam) {
         await (WorkerTeam as any).updateOne({ id: oldTeam }, { $inc: { activeTasks: -1 } });
@@ -699,9 +699,9 @@ app.put('/api/admin/issues/:id', authenticateToken, async (req: any, res) => {
         await (WorkerTeam as any).updateOne({ id: team.id }, { $inc: { activeTasks: 1 } });
         // Notify team
         await sendNotification(
-          team.id, 
-          'New Task Assigned', 
-          `A ${issue.category} issue has been assigned to ${team.name}.`, 
+          team.id,
+          'New Task Assigned',
+          `A ${issue.category} issue has been assigned to ${team.name}.`,
           issueId
         );
         // Notify admin
@@ -713,13 +713,13 @@ app.put('/api/admin/issues/:id', authenticateToken, async (req: any, res) => {
         );
       }
     }
-    
+
     // Admin notes
     if (adminNotes !== undefined) updates.adminNotes = adminNotes;
-    
+
     // Resolution image
     if (resolutionImage) updates.workerImageUrl = resolutionImage;
-    
+
     // Fake flag
     if (isFake !== undefined) {
       updates.isFake = isFake ? 1 : 0;
@@ -727,9 +727,9 @@ app.put('/api/admin/issues/:id', authenticateToken, async (req: any, res) => {
         updates.status = 'Closed';
         // Notify the reporter
         await sendNotification(
-          issue.userId, 
-          'Report Flagged', 
-          `Your report has been flagged as potentially fake by the admin.`, 
+          issue.userId,
+          'Report Flagged',
+          `Your report has been flagged as potentially fake by the admin.`,
           issueId
         );
         // Notify admin
@@ -755,9 +755,9 @@ app.put('/api/admin/issues/:id', authenticateToken, async (req: any, res) => {
         }
       }
     }
-    
+
     await (Issue as any).updateOne({ id: issueId }, { $set: updates });
-    
+
     const updated = await (Issue as any).findOne({ id: issueId }).lean();
     res.json({ success: true, issue: updated });
   } catch (err) {
@@ -771,15 +771,15 @@ app.post('/api/issues/:id/confirm', authenticateToken, async (req: any, res) => 
   try {
     const issueId = req.params.id;
     const { isResolved, feedback, verificationImage } = req.body;
-    
+
     const issue = await (Issue as any).findOne({ id: issueId });
     if (!issue) return res.status(404).json({ error: 'Issue not found' });
-    
+
     // Only the original reporter can confirm
     if (issue.userId !== req.user.id) {
       return res.status(403).json({ error: 'Only the original reporter can verify resolution' });
     }
-    
+
     const verification = {
       userId: req.user.id,
       username: req.user.username,
@@ -788,25 +788,25 @@ app.post('/api/issues/:id/confirm', authenticateToken, async (req: any, res) => 
       verificationImage: verificationImage || null,
       timestamp: new Date().toISOString()
     };
-    
+
     const newStatus = isResolved ? 'Confirmed Resolved' : 'In Progress';
-    
-    await (Issue as any).updateOne({ id: issueId }, { 
-      $set: { 
+
+    await (Issue as any).updateOne({ id: issueId }, {
+      $set: {
         citizenVerification: verification,
         status: newStatus,
         proofImageUrl: verificationImage || issue.proofImageUrl
       }
     });
-    
+
     // Update reputation
     if (isResolved) {
       await (User as any).updateOne({ id: req.user.id }, { $inc: { reputationPoints: 50 } });
       // Notify admin that citizen confirmed
       await sendNotification(
-        'admin', 
-        'Resolution Confirmed', 
-        `${req.user.username} confirmed that issue #${issueId} (${issue.category}) is properly resolved.`, 
+        'admin',
+        'Resolution Confirmed',
+        `${req.user.username} confirmed that issue #${issueId} (${issue.category}) is properly resolved.`,
         issueId
       );
     } else {
@@ -827,10 +827,10 @@ app.post('/api/issues/:id/confirm', authenticateToken, async (req: any, res) => 
         );
       }
     }
-    
+
     // Give reputation for verification action
     await (User as any).updateOne({ id: req.user.id }, { $inc: { reputationPoints: 5 } });
-    
+
     res.json({ success: true, status: newStatus });
   } catch (err) {
     console.error("Confirm error:", err);
@@ -843,24 +843,24 @@ app.get('/api/notifications', authenticateToken, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const role = req.user.role;
-    
+
     // Fetch notifications for this user, admin role, or their teams
     const query: any = {
       $or: [
         { recipientRole: userId },
       ]
     };
-    
+
     if (role === 'admin') {
       query.$or.push({ recipientRole: 'admin' });
     }
-    
+
     const notifications = await (Notification as any)
       .find(query)
       .sort({ timestamp: -1 })
       .limit(50)
       .lean();
-    
+
     res.json(notifications);
   } catch (err) {
     console.error("Notifications error:", err);
@@ -883,7 +883,7 @@ app.put('/api/notifications/read-all', authenticateToken, async (req: any, res) 
     const role = req.user.role;
     const query: any = { $or: [{ recipientRole: userId }] };
     if (role === 'admin') query.$or.push({ recipientRole: 'admin' });
-    
+
     await (Notification as any).updateMany(query, { $set: { isRead: true } });
     res.json({ success: true });
   } catch (err) {
@@ -895,10 +895,10 @@ app.put('/api/notifications/read-all', authenticateToken, async (req: any, res) 
 app.post('/api/analyze/fake-detection', authenticateToken, async (req: any, res) => {
   try {
     const { description, imageUrl, category } = req.body;
-    
+
     // NLP-based fake detection using Gemini
     const analysis = await analyzeIssueDeep(description, imageUrl, category);
-    
+
     res.json({
       success: true,
       analysis
@@ -916,7 +916,7 @@ app.post('/api/admin/analyze-issue/:id', authenticateToken, isAdmin, async (req:
     if (!issue) return res.status(404).json({ error: 'Issue not found' });
 
     const analysis = await analyzeIssueDeep(issue.description || '', issue.imageUrl, issue.category);
-    
+
     // Store the analysis results on the issue
     const coherenceScore = analysis.imageTextCoherence?.score;
     const hasRealImageAnalysis = coherenceScore !== null && coherenceScore !== undefined;
@@ -949,7 +949,7 @@ app.post('/api/admin/analyze-all', authenticateToken, isAdmin, async (req: any, 
     }
     // Only analyze issues that haven't been analyzed yet or all if requested
     const issues = await (Issue as any).find(query).lean();
-    
+
     // Analyze in parallel with rate limiting (max 3 concurrent)
     const results: any[] = [];
     const batchSize = 3;
@@ -1002,19 +1002,19 @@ app.post('/api/admin/recategorize', authenticateToken, isAdmin, async (req: any,
     };
 
     const validCategories = ['Potholes', 'Garbage Overflow', 'Road Damage', 'Broken Streetlight', 'Water Leakage', 'Drainage Problem', 'Public Facility Damage', 'Other'];
-    
+
     const issues = await (Issue as any).find().lean();
     let fixed = 0;
-    
+
     for (const issue of issues) {
       const cat = issue.category;
       let newCategory = cat;
-      
+
       // Step 1: Direct normalization from old categories
       if (categoryNormalize[cat]) {
         newCategory = categoryNormalize[cat];
       }
-      
+
       // Step 2: If still not a valid category, try AI re-categorization
       if (!validCategories.includes(newCategory)) {
         try {
@@ -1028,7 +1028,7 @@ app.post('/api/admin/recategorize', authenticateToken, isAdmin, async (req: any,
           newCategory = 'Other';
         }
       }
-      
+
       // Step 3: Keyword-based refinement for common mismatches
       const desc = (issue.description || '').toLowerCase();
       if (newCategory === 'Road Damage' || newCategory === 'Other') {
@@ -1046,7 +1046,7 @@ app.post('/api/admin/recategorize', authenticateToken, isAdmin, async (req: any,
           newCategory = 'Public Facility Damage';
         }
       }
-      
+
       if (newCategory !== cat) {
         await (Issue as any).updateOne({ id: issue.id }, { $set: { category: newCategory } });
         fixed++;
@@ -1055,12 +1055,12 @@ app.post('/api/admin/recategorize', authenticateToken, isAdmin, async (req: any,
 
       // Also cleanup false image mismatch flags from NLP fallback
       if (issue.imageTextMatch === false && (!issue.imageTextCoherenceScore || issue.imageDescription === 'Image analysis requires AI')) {
-        await (Issue as any).updateOne({ id: issue.id }, { 
-          $set: { 
-            imageTextMatch: null, 
-            imageDescription: null, 
-            imageTextCoherenceScore: null 
-          } 
+        await (Issue as any).updateOne({ id: issue.id }, {
+          $set: {
+            imageTextMatch: null,
+            imageDescription: null,
+            imageTextCoherenceScore: null
+          }
         });
         // Also reset isFake if it was only set due to false image mismatch
         if (issue.isFake >= 1 && !issue.aiAnalysis?.fakeDetection?.isFake) {
@@ -1072,7 +1072,7 @@ app.post('/api/admin/recategorize', authenticateToken, isAdmin, async (req: any,
         fixed++;
       }
     }
-    
+
     res.json({ success: true, total: issues.length, fixed, message: `Re-categorized ${fixed} issues` });
   } catch (err) {
     console.error("Re-categorize error:", err);
@@ -1084,20 +1084,20 @@ app.post('/api/admin/recategorize', authenticateToken, isAdmin, async (req: any,
 app.get('/api/admin/category-analysis', authenticateToken, isAdmin, async (req, res) => {
   try {
     const issues = await (Issue as any).find().lean();
-    
+
     // Build category statistics
     const categoryStats: any = {};
     const priorityByCategory: any = {};
     const fakeByCategory: any = {};
     const sentimentByCategory: any = {};
-    
+
     for (const issue of issues) {
       const cat = issue.category || 'Other';
       if (!categoryStats[cat]) {
         categoryStats[cat] = { total: 0, resolved: 0, pending: 0, inProgress: 0, avgResolutionDays: 0, resolutionDays: [] };
       }
       categoryStats[cat].total++;
-      
+
       if (issue.status === 'Resolved' || issue.status === 'Confirmed Resolved') {
         categoryStats[cat].resolved++;
         if (issue.resolvedAt && issue.timestamp) {
@@ -1109,12 +1109,12 @@ app.get('/api/admin/category-analysis', authenticateToken, isAdmin, async (req, 
       } else {
         categoryStats[cat].pending++;
       }
-      
+
       // Priority distribution
       if (!priorityByCategory[cat]) priorityByCategory[cat] = { Emergency: 0, High: 0, Normal: 0 };
       const prio = issue.priority || 'Normal';
       priorityByCategory[cat][prio] = (priorityByCategory[cat][prio] || 0) + 1;
-      
+
       // Fake distribution
       if (!fakeByCategory[cat]) fakeByCategory[cat] = { fake: 0, genuine: 0 };
       if (issue.isFake && issue.isFake >= 1) {
@@ -1122,21 +1122,21 @@ app.get('/api/admin/category-analysis', authenticateToken, isAdmin, async (req, 
       } else {
         fakeByCategory[cat].genuine++;
       }
-      
+
       // Sentiment (from upvotes)
       if (!sentimentByCategory[cat]) sentimentByCategory[cat] = { totalUpvotes: 0, count: 0 };
       sentimentByCategory[cat].totalUpvotes += issue.upvotes || 0;
       sentimentByCategory[cat].count++;
     }
-    
+
     // Calculate averages
     for (const cat of Object.keys(categoryStats)) {
       const days = categoryStats[cat].resolutionDays;
-      categoryStats[cat].avgResolutionDays = days.length > 0 ? 
+      categoryStats[cat].avgResolutionDays = days.length > 0 ?
         Math.round((days.reduce((a: number, b: number) => a + b, 0) / days.length) * 10) / 10 : 0;
       delete categoryStats[cat].resolutionDays;
     }
-    
+
     // NLP keyword extraction from descriptions
     const keywordsByCategory: any = {};
     for (const issue of issues) {
@@ -1150,7 +1150,7 @@ app.get('/api/admin/category-analysis', authenticateToken, isAdmin, async (req, 
         keywordsByCategory[cat][w] = (keywordsByCategory[cat][w] || 0) + 1;
       });
     }
-    
+
     // Top keywords per category
     const topKeywords: any = {};
     for (const cat of Object.keys(keywordsByCategory)) {
@@ -1159,7 +1159,7 @@ app.get('/api/admin/category-analysis', authenticateToken, isAdmin, async (req, 
         .slice(0, 10)
         .map(([word, count]) => ({ word, count }));
     }
-    
+
     res.json({
       categoryStats,
       priorityByCategory,
@@ -1182,7 +1182,7 @@ async function runEscalationEngine() {
     // Escalate issues older than 48 hours (for demo purposes, we'll escalate issues older than 2 minutes if they are pending)
     // To make it easy to test, we'll use a 2 minute threshold. In production, this would be 48 hours.
     const thresholdDate = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    
+
     const oldIssues = await (Issue as any).find({
       status: { $in: ['Pending', 'Assigned'] },
       priority: { $ne: 'Emergency' },
@@ -1195,8 +1195,8 @@ async function runEscalationEngine() {
       for (const issue of oldIssues) {
         await (Issue as any).updateOne(
           { id: issue.id },
-          { 
-            $set: { 
+          {
+            $set: {
               priority: 'Emergency',
               adminNotes: `⚠️ ESCALATED BY SYSTEM: Unresolved for too long. Previous notes: ${issue.adminNotes || ''}`
             }
@@ -1233,3 +1233,6 @@ async function startServer() {
 if (!process.env.VERCEL) {
   startServer();
 }
+
+
+
